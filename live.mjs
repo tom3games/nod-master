@@ -8,6 +8,7 @@ for (const [name, bt, opts] of [['chromium', chromium, {}], ['webkit', webkit, {
   const errs = []
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()) })
   p.on('requestfailed', r => errs.push('fail ' + r.url()))
+  await ctx.addInitScript(() => { try { localStorage.setItem('nm.played', '1') } catch (e) {} })
   await p.goto(URL0 + '?t=' + Date.now(), { waitUntil: 'networkidle' })
   await p.waitForFunction(() => window.__nmReady, null, { timeout: 15000 })
   // 遊びの通し: タイトル → 会議 → 結果
