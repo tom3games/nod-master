@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, statSync } from 'node:fs'
 const ROOT = import.meta.dirname
 mkdirSync(ROOT + '/shots', { recursive: true })
-const PORT = 5471
+const PORT = +process.env.PORT || 5571
 const server = spawn(process.execPath, ['server.mjs'], { cwd: ROOT, env: { ...process.env, PORT: String(PORT) } })
 await new Promise(r => setTimeout(r, 400))
 const URL0 = `http://localhost:${PORT}/`
@@ -52,6 +52,20 @@ const glVar = p => p.evaluate(() => {
   let s = 0, s2 = 0, n = 0; for (let i = 0; i < d.length; i += 4 * 7) { const v = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; s += v; s2 += v * v; n++ }
   return Math.round(s2 / n - (s / n) ** 2)
 })
+// Xでポスト: window.open を差し替えて、開かれるURLを取る
+const xCheck = async (p, ns, want, tag, pub) => {
+  await p.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null } })
+  const vis = await p.isVisible('#bX'); expect(vis, 'Xボタンが見えない')
+  await p.click('#bX')
+  const r = await p.evaluate(ns => ({ o: window.__opened, api: window[ns].xPost(), label: document.querySelector('#bX').textContent.trim(), bg: getComputedStyle(document.querySelector('#bX')).backgroundColor, svg: !!document.querySelector('#bX svg path') }), ns)
+  expect(r.o.length === 1, 'open回数 ' + r.o.length)
+  const [href, target, feat] = r.o[0], u = new URL(href), text = u.searchParams.get('text')
+  expect(href.startsWith('https://x.com/intent/post?') && target === '_blank' && /noopener/.test(feat), href + ' ' + target + ' ' + feat)
+  expect(u.searchParams.get('url') === pub && !/https?:/.test(text), 'url ' + href)
+  expect(text.includes(tag) && want.every(w => text.includes(w)), 'text ' + text + ' want ' + want.join(','))
+  expect(text === r.api.text && r.svg && r.bg === 'rgb(0, 0, 0)', JSON.stringify(r))
+  return { label: r.label, text }
+}
 const SIZES = [[360, 640, 'small'], [390, 844, 'phone'], [844, 390, 'land'], [667, 375, 'land-se'], [768, 1024, 'tab'], [1440, 900, 'pc']]
 // 台本の決まった時点まで進める
 const toFirstCue = (p, off) => p.evaluate(off => {
@@ -244,6 +258,10 @@ await t('結果画像: 「画像を保存」でPNGがダウンロードされる
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 8000 }), p.click('#bSave')])
   const path = ROOT + '/shots/card.png'; await dl.saveAs(path); const sz = statSync(path).size; expect(dl.suggestedFilename() === 'nod-master.png' && sz > 50000, sz); return sz
 })
+await t('Xでポスト: 押すと結果入りの x.com/intent/post が新しいタブで開く', async () => {
+  const w = await p.evaluate(() => [nm.G.result.grade.ja, nm.G.result.grade.tja])
+  const r = await xCheck(p, 'nm', w, '#うなずきマスター', 'https://tom3games.github.io/nod-master/'); expect(r.label === 'Xでポスト', r.label); return r
+})
 await t('もう一回ですぐ次の会議が始まる', async () => { await p.evaluate(() => nm.dbg.pause(false)); await p.click('#bAgain'); const r = await p.evaluate(() => ({ v: nm.S.view, i: nm.G.i, over: nm.G.over })); expect(r.v === 'play' && !r.over, JSON.stringify(r)) })
 await t('スペースキーでうなずける（PC）', async () => {
   await p.evaluate(() => { nm.dbg.pause(true); nm.dbg.step(30) }); await p.keyboard.press('Space')
@@ -266,6 +284,10 @@ await t('英語: 切り替えるとタイトル・遊び方・台本・結果が
   expect(r.t1.includes('NOD') && !r.ja && r.cue && /SPACE/.test(r.how), JSON.stringify(r)); return r.res
 })
 await p.screenshot({ path: ROOT + '/shots/08-result-en.png' })
+await t('英語: Post on X も英語の結果とハッシュタグで開く', async () => {
+  const w = await p.evaluate(() => [nm.G.result.grade.en, nm.G.result.grade.ten])
+  const r = await xCheck(p, 'nm', w, '#NodMaster', 'https://tom3games.github.io/nod-master/'); expect(r.label === 'Post on X', r.label); return r
+})
 await t('英語: 結果画像も英語で描ける', async () => { const r = await p.evaluate(() => nm.makeCard().width); expect(r === 1080, r) })
 await t('ここまでエラーなし', async () => { expect(p.errs.length === 0, p.errs.join('|')) })
 await p.close()

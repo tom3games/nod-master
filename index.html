@@ -50,6 +50,8 @@ button{font-family:inherit;color:inherit;font-size:inherit;font-weight:800}
 .btn.red{background:var(--red);color:#fff;font-size:21px;min-height:62px}
 .btn.yellow{background:var(--yellow)}
 .btn.ghost{background:rgba(255,253,246,.88);font-size:16px;min-height:48px}
+.btn.xpost{background:#000;color:#fff}
+.btn svg.xlogo{fill:currentColor;stroke:none;width:20px;height:20px}
 .row{display:flex;gap:10px;width:100%}
 .row>.btn{flex:1;min-width:0;padding:0 10px;white-space:nowrap;letter-spacing:0}
 .resBtns .row>.btn{font-size:16px}
@@ -195,11 +197,12 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
   #hanko{width:min(84px,22vh)}
   .stats{font-size:11px;margin-top:3px;padding-top:3px}
   .bossCmt svg{width:40px}.bossCmt p{font-size:12px;padding:5px 10px}
-  .resBtns{flex-direction:row;gap:8px}
-  .resBtns .row{flex:2}
-  .resBtns .btn{min-height:42px;font-size:13px;padding:0 6px;gap:4px;white-space:nowrap;letter-spacing:0}
-  .resBtns .btn.red{min-height:42px;font-size:15px;flex:1.2}
-  .resBtns .btn svg{width:18px;height:18px}
+  .resBtns{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}
+  .resBtns .row{display:contents}
+  #bAgain{grid-area:1/1}#bTitle{grid-area:1/2}#bSave{grid-area:2/1}#bX{grid-area:2/2}
+  .resBtns .btn{min-height:40px;font-size:13px;padding:0 6px;gap:4px;white-space:nowrap;letter-spacing:0}
+  .resBtns .btn.red{min-height:40px;font-size:15px}
+  .resBtns .btn svg{width:18px;height:18px}.resBtns .btn svg.xlogo{width:15px;height:15px}
 }
 </style>
 </head>
@@ -270,8 +273,9 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
       <button class="btn red" id="bAgain"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/></svg><span data-t="again"></span></button>
       <div class="row">
         <button class="btn yellow" id="bSave"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span data-t="save"></span></button>
-        <button class="btn ghost" id="bTitle"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></svg><span data-t="toTitle"></span></button>
+        <button class="btn xpost" id="bX" type="button"><svg class="xlogo" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg><span data-t="xPost"></span></button>
       </div>
+      <button class="btn ghost" id="bTitle"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></svg><span data-t="toTitle"></span></button>
     </div>
   </div>
 </main>
@@ -299,8 +303,8 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
   },6000);
 })();
 </script>
-<script src="snd.js?v=2"></script>
-<script src="data.js?v=2"></script>
-<script type="module" src="game.js?v=2"></script>
+<script src="snd.js?v=3"></script>
+<script src="data.js?v=3"></script>
+<script type="module" src="game.js?v=3"></script>
 </body>
 </html>

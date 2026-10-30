@@ -729,6 +729,12 @@ async function saveImage() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(T('saved')); return blob
 }
+const PUBLIC_URL = 'https://tom3games.github.io/nod-master/'
+function xPost() {
+  const g = G.result.grade, text = T('xText').replace('{g}', S.lang === 'ja' ? g.ja : g.en).replace('{t}', S.lang === 'ja' ? g.tja : g.ten)
+  return { text, url: PUBLIC_URL, href: `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(PUBLIC_URL)}` }
+}
+function openX() { if (!G || !G.result) return; window.open(xPost().href, '_blank', 'noopener') }
 function toast(s) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = s; document.body.appendChild(d); setTimeout(() => d.remove(), 1600) }
 
 // ---------- ループ（固定60Hz）
@@ -755,6 +761,7 @@ function boot() {
   on('#bHowGo', () => { Snd.sfx('tap'); try { localStorage.setItem('nm.played', '1') } catch (e) {} S.firstPlay = false; startGame() })
   on('#bAgain', () => { Snd.sfx('tap'); startGame() })
   on('#bSave', () => saveImage())
+  on('#bX', () => { Snd.sfx('tap'); openX() })
   on('#bTitle', () => { Snd.sfx('tap'); go('title') })
   on('#bA0', () => choose(0)); on('#bA1', () => choose(1))
   on('#bLang', () => { S.lang = S.lang === 'ja' ? 'en' : 'ja'; try { localStorage.setItem('nm.lang', S.lang) } catch (e) {} applyLang() })
@@ -777,7 +784,7 @@ function boot() {
 // 検証用の窓口
 window.nm = {
   S, A, get G() { return G }, B, U, camera, renderer, scene, Snd, GRADES,
-  start: seed => startGame(seed), frameTo: (r, k) => frameCamera(r, k && k.map(a => new THREE.Vector3(...a))), nod, choose, makeScript, computeResult, makeCard, saveImage, frameCamera, go, finish,
+  start: seed => startGame(seed), frameTo: (r, k) => frameCamera(r, k && k.map(a => new THREE.Vector3(...a))), nod, choose, makeScript, computeResult, makeCard, saveImage, xPost, openX, frameCamera, go, finish,
   setBot: b => { if (G) G.bot = b },
   fps: () => fps, frameRect: () => frameRect,
   project: () => ({ sub: SUB_HEAD(), boss: BOSS_HEAD() }),
