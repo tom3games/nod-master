@@ -327,41 +327,43 @@ let G = null
 function makeScript(seed, lang) {
   const r = rng(seed), L = TALK[lang], Q = ASKS[lang], ja = lang === 'ja'
   const ev = []; let t = 0
-  const cps = tt => ja ? 10.5 + tt / 60 * 3.5 : 22 + tt / 60 * 7
-  const line = (body, end, cue) => {
+  const cps = tt => ja ? 11 + tt / 60 * 8 : 23 + tt / 60 * 16
+  const gap = tt => lerp(0.75, 0.42, clamp(tt / 55, 0, 1))
+  const line = (body, end, cue, trap = false) => {
     const c = cps(t), len = [...body + end].length, cueAt = 0.2 + (len - 1) / c
-    const e = { type: 'line', body, end, cue, cps: c, len, cueAt, dur: cue ? cueAt + 0.8 : 0.2 + len / c + 0.45, at: t }
+    const e = { type: 'line', body, end, cue, cps: c, len, cueAt, dur: cue ? cueAt + gap(t) : 0.2 + len / c + 0.45, at: t, trap }
     ev.push(e); t += e.dur
   }
   line(UI[lang].startLine, '', false)
   const pairs = Q.pairs.slice().sort(() => r() - 0.5)
-  const askAt = [15 + r() * 4, 36 + r() * 5]; let ai = 0, lastTail = false
+  const askAt = [11 + r() * 4, 27 + r() * 4, 42 + r() * 4]; let ai = 0, lastTail = false
   const usedMid = new Set()
   const mid = () => { let m; for (let k = 0; k < 8; k++) { m = pick(r, L.mid); if (!usedMid.has(m)) break } usedMid.add(m); if (usedMid.size > L.mid.length - 4) usedMid.clear(); return m }
-  while (t < 55) {
-    if (ai < 2 && t >= askAt[ai]) { const e = { type: 'ask', q: pick(r, Q.q), pair: pairs[ai], swap: r() < 0.5, at: t, good: pick(r, Q.good), bad: pick(r, Q.bad) }; ev.push(e); t += 6.2; ai++; continue }
-    const cue = lastTail || r() < 0.86
+  while (t < 57) {
+    if (ai < 3 && t >= askAt[ai]) { const e = { type: 'ask', q: pick(r, Q.q), pair: pairs[ai], swap: r() < 0.5, at: t, good: pick(r, Q.good), bad: pick(r, Q.bad) }; ev.push(e); t += ASK_EST; ai++; continue }
+    const roll = r(), cue = lastTail || roll < 0.62, trap = !cue && roll < 0.9
     const nMid = t > 30 ? 3 : 2
     const op = r() < 0.55 ? pick(r, L.open) : '', mids = []; for (let k = 0; k < nMid; k++) mids.push(mid())
-    const end = cue ? pick(r, L.cue) : pick(r, L.tail), lim = ja ? 38 : 84
+    const end = cue ? pick(r, L.cue) : trap ? pick(r, L.trap) : pick(r, L.tail), lim = ja ? 38 : 84
     let body = op + mids.join(''); if ([...body + end].length > lim) body = mids.join(''); if ([...body + end].length > lim) body = mids.slice(0, 2).join('')
     if (ja) body = body.replace(/(て|を|で|に)$/, '$1、')
-    line(body, end, cue); lastTail = !cue
+    line(body, end, cue, trap); lastTail = !cue && !trap
   }
   // 「〜ね？」が少ない台本は、ぼやき行を「〜ね？」に替えて8回以上にする（時刻は引き直す）
   let nc = ev.filter(e => e.cue).length
-  for (const e of ev) { if (nc >= 8) break; if (e.type === 'line' && !e.cue && e.at > 0) { e.cue = true; e.end = pick(r, L.cue); e.len = [...e.body + e.end].length; nc++ } }
+  for (const e of ev) { if (nc >= 8) break; if (e.type === 'line' && !e.cue && e.at > 0) { e.cue = true; e.trap = false; e.end = pick(r, L.cue); e.len = [...e.body + e.end].length; nc++ } }
   t = 0
-  for (const e of ev) { e.at = t; if (e.type === 'line') { e.cueAt = 0.2 + (e.len - 1) / e.cps; e.dur = e.cue ? e.cueAt + 0.8 : 0.2 + e.len / e.cps + 0.45; t += e.dur } else t += 6.2 }
+  for (const e of ev) { e.at = t; if (e.type === 'line') { e.cueAt = 0.2 + (e.len - 1) / e.cps; e.dur = e.cue ? e.cueAt + gap(t) : 0.2 + e.len / e.cps + 0.45; t += e.dur } else t += ASK_EST }
   ev.push({ type: 'end', at: t })
   return ev
 }
-const ringDur = t => lerp(1.05, 0.75, clamp(t / 55, 0, 1))
-const W_PERFECT = 0.11, W_GOOD = 0.28, W_LATE = 0.45, NOTICE = 1.9
+const ringDur = t => lerp(0.9, 0.6, clamp(t / 55, 0, 1))
+// 難しさの数値（2026-10-30 本人「もっとむづかしく」で締めた）
+const W_PERFECT = 0.07, W_GOOD = 0.18, W_LATE = 0.32, NOTICE = 1.5, WAKE_TAPS = 7, ASK_TIME = 2.0, ASK_EST = 5.0
 function startGame(seed = (Date.now() & 0xffffff)) {
   const ev = makeScript(seed, S.lang)
   G = { seed, ev, i: 0, et: 0, t: 0, total: ev[ev.length - 1].at + 2.2, sleep: 18, mood: 60, asleep: false, sleepT: 0, mash: 0, snoreT: 0, inter: null, cue: 'pending', judgedAt: -9, ask: null, over: false, bot: null, botR: rng(seed ^ 0x55),
-    st: { perfect: 0, good: 0, early: 0, late: 0, miss: 0, extra: 0, shirome: 0, askGood: 0, askBad: 0, askTimeout: 0, notice: 0, cues: ev.filter(e => e.cue).length }, shown: '', result: null, rt: -1 }
+    st: { perfect: 0, good: 0, early: 0, late: 0, miss: 0, extra: 0, trap: 0, shirome: 0, askGood: 0, askBad: 0, askTimeout: 0, notice: 0, cues: ev.filter(e => e.cue).length }, shown: '', result: null, rt: -1 }
   A.pose = 'none'; A.asleep = false; A.anger = 0; A.sleepVis = 0
   $('#ask').hidden = true; $('#wake').hidden = true
   go('play')
@@ -377,21 +379,22 @@ function nextEv() {
 function judge(kind) {
   const s = G.st; s[kind]++
   const P = POP[S.lang], r = G.botR
-  const md = { perfect: 2, good: 1, early: -5, late: -4, miss: -6, extra: -3 }[kind], sd = { perfect: -16, good: -10, early: -5, late: -5, miss: 0, extra: -4 }[kind]
+  const md = { perfect: 2, good: 1, early: -5, late: -4, miss: -6, extra: -3, trap: -7 }[kind], sd = { perfect: -18, good: -10, early: -4, late: -4, miss: 0, extra: -3, trap: -3 }[kind]
   G.mood = clamp(G.mood + md, 0, 100); G.sleep = clamp(G.sleep + sd, 0, 100)
-  if (kind !== 'extra') { G.cue = 'done'; G.judgedAt = G.t }
+  if (kind !== 'extra' && kind !== 'trap') { G.cue = 'done'; G.judgedAt = G.t }
   if (kind === 'perfect') { Snd.sfx('perfect'); A.smile = 1; A.happy = 0.6; pop(SUB_HEAD(), pick(r, P.perfect), 'perfect'); pop(BOSS_HEAD(), 'PERFECT', 'judge perfect') }
   else if (kind === 'good') { Snd.sfx('good'); pop(SUB_HEAD(), pick(r, P.good), 'good'); pop(BOSS_HEAD(), 'GOOD', 'judge good') }
   else {
     Snd.sfx('miss'); pop(SUB_HEAD(), pick(r, P[kind]), 'bad')
     const bp = BOSS_POP[S.lang][kind === 'late' ? 'miss' : kind]
-    if (bp) { A.anger = Math.max(A.anger, kind === 'extra' ? 0.25 : 0.45); pop(BOSS_HEAD(), pick(r, bp), 'boss') }
+    if (kind === 'trap') Snd.sfx('boo')
+    if (bp) { A.anger = Math.max(A.anger, kind === 'extra' ? 0.25 : kind === 'trap' ? 0.6 : 0.45); pop(BOSS_HEAD(), pick(r, bp), 'boss') }
   }
 }
 function nod() {
   if (!G || G.over || S.view !== 'play' || G.inter) return
   if (G.ask && G.ask.phase === 'choose') return
-  if (G.asleep) { G.mash++; A.mash += 1; Snd.sfx('tap', 0.6); if (G.mash >= 4) wake(); return }
+  if (G.asleep) { G.mash++; A.mash += 1; Snd.sfx('tap', 0.6); if (G.mash >= WAKE_TAPS) wake(); return }
   A.nodT = 0; A.nodBig = 0; Snd.sfx('nod'); hitBtn()
   const e = curEv()
   if (e && e.type === 'line' && e.cue && G.cue === 'pending') {
@@ -402,7 +405,8 @@ function nod() {
     else if (d <= W_GOOD) judge('good')
     else if (d <= W_LATE) judge('late')
     else judge('extra')
-  } else if (G.t - G.judgedAt > 0.3) judge('extra')
+  } else if (e && e.type === 'line' && e.trap && G.et > e.len / e.cps - 0.6) judge('trap')
+  else if (G.t - G.judgedAt > 0.3) judge('extra')
   else G.sleep = clamp(G.sleep - 2, 0, 100)
 }
 function fallAsleep() {
@@ -453,7 +457,7 @@ function update(dt) {
       const len = [...e.q].length, n = clamp(Math.floor(a.t * 12) + 1, 0, len); if (n > (G.shownN || 0)) Snd.babble(false); G.shownN = n; A.talking = n < len; A.expect = n >= len ? 1 : 0
       if (a.t > len / 12 + 0.25) { a.phase = 'choose'; a.t = 0; G.shownN = 0; showAsk(e) }
     } else if (a.phase === 'choose') {
-      A.expect = 1; const left = 3.2 - a.t; $('#askBar').style.width = clamp(left / 3.2 * 100, 0, 100) + '%'
+      A.expect = 1; const left = ASK_TIME - a.t; $('#askBar').style.width = clamp(left / ASK_TIME * 100, 0, 100) + '%'
       if (left < 1.5 && Math.floor(left * 2) !== Math.floor((left + dt) * 2)) Snd.sfx('tick')
       if (left <= 0) { G.ask = { phase: 'react', t: 0, good: false, timeout: true, text: T('askTimeout') }; $('#ask').hidden = true; G.st.askTimeout++; G.mood = clamp(G.mood - 14, 0, 100); A.anger = 0.7; Snd.sfx('cricket') }
     } else if (a.phase === 'react') {
@@ -467,7 +471,7 @@ function update(dt) {
   }
   // 眠気
   const frozen = G.ask && G.ask.phase !== 'q'
-  if (!G.asleep && !frozen) { G.sleep += (2.3 + 2.4 * clamp(G.t / 55, 0, 1)) * dt; if (G.sleep >= 100) { G.sleep = 100; fallAsleep() } }
+  if (!G.asleep && !frozen) { G.sleep += (2.8 + 3.2 * clamp(G.t / 55, 0, 1)) * dt; if (G.sleep >= 100) { G.sleep = 100; fallAsleep() } }
   if (G.asleep) { G.sleepT += dt; G.snoreT += dt; if (G.snoreT > 1.5) { G.snoreT = 0; Snd.sfx('snore') } if (G.sleepT >= NOTICE) notice() }
   A.sleepVis = clamp((G.sleep - 30) / 70, 0, 1)
   const asking = !!(G.ask && G.ask.phase === 'choose'); if (asking !== S.asking) { S.asking = asking; document.body.classList.toggle('asking', asking) }
@@ -475,19 +479,27 @@ function update(dt) {
 }
 function botStep() {
   const e = curEv(), r = G.botR
-  if (G.asleep) { if (G.bot !== 'none' && G.bot !== 'sleeper') nod(); return }
-  if (G.ask && G.ask.phase === 'choose') { if (G.bot === 'perfect') choose(e.swap ? 1 : 0); else if (G.bot === 'random' && G.ask.t > 0.6) choose(r() < 0.5 ? 0 : 1); return }
+  // 白目中の連打は人の速さ（1秒に約8回）
+  if (G.asleep) { if (G.bot !== 'none' && G.bot !== 'sleeper') { G.botMash = (G.botMash || 0) + 1; if (G.botMash % 7 === 0) nod() } return }
+  if (G.ask && G.ask.phase === 'choose') {
+    if (G.bot === 'perfect') choose(e.swap ? 1 : 0)
+    else if (G.bot === 'skilled' && G.ask.t > 0.9) { if (e.botPick === undefined) e.botPick = r() < 0.85; choose(e.botPick !== e.swap ? 0 : 1) }
+    else if (G.bot === 'random' && G.ask.t > 1.1) choose(r() < 0.5 ? 0 : 1)
+    return }
+  if (G.bot === 'random' && e && e.type === 'line' && e.trap) { if (e.botTrap === undefined) e.botTrap = r() < 0.35; if (e.botTrap && G.et > e.len / e.cps) { e.botTrap = false; nod() } }
   if (!e || e.type !== 'line' || !e.cue || G.cue !== 'pending') return
   if (G.bot === 'perfect' && G.et >= e.cueAt) nod()
+  // 上手い人: ずれは正規分布（標準偏差0.05秒）、返事は85%正解
+  if (G.bot === 'skilled') { if (e.botOff === undefined) { const u = Math.max(1e-6, r()), v = r(); e.botOff = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * 0.05 } if (G.et >= e.cueAt + e.botOff) nod() }
   if (G.bot === 'random') { if (e.botOff === undefined) e.botOff = (r() - 0.45) * 0.7; if (G.et >= e.cueAt + e.botOff) nod() }
 }
 // ---------- 結果
 function computeResult(st, mood) {
   // うなずきは回数で割って100点満点にする（台本ごとの「〜ね？」の数の差を消す）
-  const nodPts = (st.perfect * 10 + st.good * 6 - (st.early + st.late + st.miss) * 4 - st.extra * 2) / Math.max(1, st.cues) * 10
+  const nodPts = (st.perfect * 10 + st.good * 6 - (st.early + st.late + st.miss) * 4 - st.extra * 2 - (st.trap || 0) * 5) / Math.max(1, st.cues) * 10
   const score = Math.round(nodPts + st.askGood * 8 - st.askBad * 3 - st.askTimeout * 5 + (mood - 50) * 0.4 - st.shirome * 15)
   const grade = GRADES.find(g => score >= g.min && st.shirome <= g.shiromeMax)
-  const X = EXTRA_CMT[S.lang], nods = st.perfect + st.good + st.early + st.late + st.extra
+  const X = EXTRA_CMT[S.lang], nods = st.perfect + st.good + st.early + st.late + st.extra + (st.trap || 0)
   let cmt = S.lang === 'ja' ? grade.cja : grade.cen
   if (nods === 0) cmt = X.noNod
   else if (st.shirome >= 3) cmt = X.manyShirome
@@ -521,10 +533,10 @@ function resultStep(dt) {
 function fillResult() {
   const R = G.result, st = G.st, g = R.grade, ja = S.lang === 'ja'
   $('#rTitle').textContent = ja ? `「${g.tja}」` : `"${g.ten}"`
-  const tm = T('times'), miss = st.early + st.late + st.miss
+  const tm = T('times'), miss = st.early + st.late + st.miss + (st.trap || 0)
   $('#rStats').innerHTML = [
     [T('sPerfect'), `${st.perfect}${tm}`], [T('sGood'), `${st.good}${tm}`], [T('sMiss'), `${miss}${tm}`, miss > 0],
-    [T('sShirome'), `${st.shirome}${tm}`, st.shirome > 0], [T('sAnswer'), `${st.askGood} / 2`], [T('sMood'), `${R.mood}%`, R.mood < 30],
+    [T('sShirome'), `${st.shirome}${tm}`, st.shirome > 0], [T('sAnswer'), `${st.askGood} / 3`], [T('sMood'), `${R.mood}%`, R.mood < 30],
   ].map(([a, b, n]) => `<span>${a}</span><b class="${n ? 'neg' : ''}">${b}</b>`).join('')
   $('#hanko').innerHTML = hankoSVG(g)
   $('#hanko').classList.remove('on')
@@ -589,7 +601,7 @@ function pop([x, y], text, cls) {
   if (S.view !== 'play') return
   const d = document.createElement('div'); d.className = 'pop ' + cls; d.textContent = text
   d.style.left = clamp(x, 70, innerWidth - 70) + 'px'; d.style.top = clamp(y, 60, innerHeight - 40) + 'px'
-  document.body.appendChild(d); setTimeout(() => d.remove(), 1150)
+  document.body.appendChild(d); const hw = d.offsetWidth / 2 + 8; d.style.left = clamp(x, hw, innerWidth - hw) + 'px'; setTimeout(() => d.remove(), 1150)
 }
 let shakeT = 0, shakeAmt = 0
 function shake(s) { shakeT = s; shakeAmt = 10 }
@@ -685,7 +697,7 @@ function makeCard() {
   x.lineWidth = 3; x.strokeStyle = '#b89a4a'; roundRect(x, 58, 798, 964, 434, 18); x.stroke()
   x.textAlign = 'center'; x.fillStyle = '#6b4e12'; x.font = `900 40px ${ff}`; x.fillText(T('resultHead'), 540, 856)
   x.textAlign = 'left'; x.fillStyle = '#16161d'; x.font = `900 ${ja ? 58 : 50}px ${ff}`; x.fillText(ja ? `「${g.tja}」` : `"${g.ten}"`, 86, 940)
-  x.font = `700 34px ${ff}`; const miss = st.early + st.late + st.miss, tm = T('times')
+  x.font = `700 34px ${ff}`; const miss = st.early + st.late + st.miss + (st.trap || 0), tm = T('times')
   const rows = [[T('sPerfect'), st.perfect + tm], [T('sShirome'), st.shirome + tm], [T('sMiss'), miss + tm], [T('sMood'), R.mood + '%']]
   rows.forEach(([a, b], i) => { x.fillStyle = '#333'; x.textAlign = 'left'; x.fillText(a, 96, 1012 + i * 54); x.textAlign = 'right'; x.font = `900 36px ${ff}`; x.fillStyle = '#16161d'; x.fillText(b, 640, 1012 + i * 54); x.font = `700 34px ${ff}` })
   // ハンコ

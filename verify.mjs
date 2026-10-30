@@ -96,11 +96,11 @@ await t('台本: 同じ種なら同じ台本、違う種なら違う', async () 
   const r = await p.evaluate(() => { const a = JSON.stringify(nm.makeScript(3, 'ja')), b = JSON.stringify(nm.makeScript(3, 'ja')), c = JSON.stringify(nm.makeScript(4, 'ja')); return [a === b, a !== c] })
   expect(r[0] && r[1], r)
 })
-await t('台本: どの種でも 50〜62秒・「〜ね？」が8回以上・質問2回・輪が出る余裕がある', async () => {
+await t('台本: どの種でも 50〜62秒・「〜ね？」が8回以上・質問3回・輪が出る余裕がある', async () => {
   const r = await p.evaluate(() => { const bad = []; let minC = 99, maxT = 0, minT = 99
     for (let s = 1; s <= 60; s++) for (const L of ['ja', 'en']) { const ev = nm.makeScript(s, L), end = ev[ev.length - 1].at + 2.2, cues = ev.filter(e => e.cue), asks = ev.filter(e => e.type === 'ask').length
       minC = Math.min(minC, cues.length); maxT = Math.max(maxT, end); minT = Math.min(minT, end)
-      if (end < 50 || end > 62 || cues.length < 8 || asks !== 2 || cues.some(e => e.cueAt < 1.1)) bad.push(s + L) }
+      if (end < 50 || end > 62 || cues.length < 8 || asks !== 3 || cues.some(e => e.cueAt < 1.1)) bad.push(s + L) }
     return { bad: bad.slice(0, 5), minC, minT: +minT.toFixed(1), maxT: +maxT.toFixed(1) } })
   expect(!r.bad.length, JSON.stringify(r)); return r
 })
@@ -111,9 +111,10 @@ await t('台本: 吹き出しが3行に収まる長さ（日本語40字・英語
 
 // ---------- 判定
 await t('判定: 「？」ちょうどでうなずく → 完璧', async () => { const r = await toFirstCue(p, 0); expect(r.st.perfect === 1, JSON.stringify(r)); return r.d })
-await t('判定: 0.2秒ずれ → まあまあ', async () => { const r = await toFirstCue(p, 0.2); expect(r.st.good === 1 && r.st.perfect === 0, JSON.stringify(r)) })
+await t('判定: 0.13秒ずれ → まあまあ', async () => { const r = await toFirstCue(p, 0.13); expect(r.st.good === 1 && r.st.perfect === 0, JSON.stringify(r)) })
 await t('判定: 0.6秒早い → 早すぎ', async () => { const r = await toFirstCue(p, -0.6); expect(r.st.early === 1, JSON.stringify(r)) })
-await t('判定: 0.38秒遅い → 遅すぎ', async () => { const r = await toFirstCue(p, 0.38); expect(r.st.late === 1, JSON.stringify(r)) })
+await t('判定: 0.09秒ずれは完璧にならない', async () => { const r = await toFirstCue(p, 0.09); expect(r.st.good === 1 && r.st.perfect === 0, JSON.stringify(r)) })
+await t('判定: 0.26秒遅い → 遅すぎ', async () => { const r = await toFirstCue(p, 0.26); expect(r.st.late === 1, JSON.stringify(r)) })
 await t('判定: うなずかないまま過ぎる → うなずき忘れ', async () => {
   const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(7); const ci = g.ev.findIndex(e => e.type === 'line' && e.cue); while (g.i <= ci) nm.dbg.step(1); return g.st })
   expect(r.miss === 1 && r.perfect === 0, JSON.stringify(r))
@@ -125,6 +126,20 @@ await t('判定: 「〜ね？」以外でうなずく → うなずきすぎ（�
 await t('判定: 同じ「〜ね？」で2回は取れない', async () => {
   const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(7); const ci = g.ev.findIndex(e => e.type === 'line' && e.cue); while (g.i < ci) nm.dbg.step(1); const e = g.ev[ci]; while (g.et < e.cueAt) nm.dbg.step(1); nm.nod(); nm.dbg.step(25); nm.nod(); return g.st })
   expect(r.perfect === 1 && r.good === 0, JSON.stringify(r))
+})
+await t('ひっかけ: 「〜ね。」（？なし）でうなずくと減点、輪は出ない', async () => {
+  const r = await p.evaluate(() => { nm.dbg.pause(true); for (let sd = 1; sd < 40; sd++) { const ev = nm.makeScript(sd, 'ja'); const ti = ev.findIndex(e => e.trap); if (ti < 0) continue
+    const g = nm.start(sd); g.bot = 'perfect'; while (g.i < ti) nm.dbg.step(1); g.bot = null; const e = g.ev[ti]; while (g.et < e.len / e.cps) nm.dbg.step(1); nm.dbg.render(); const ring = getComputedStyle(document.querySelector('#ring')).opacity, m = g.mood; nm.nod()
+    return { sd, end: e.end, trap: g.st.trap, dm: g.mood - m, ring } } return null })
+  expect(r && r.trap === 1 && r.dm <= -7 && r.ring === '0' && !/[？?]/.test(r.end), JSON.stringify(r)); return r
+})
+await t('ひっかけ: 台本の2割前後が「〜ね。」', async () => {
+  const r = await p.evaluate(() => { let tr = 0, n = 0; for (let sd = 1; sd <= 40; sd++) for (const e of nm.makeScript(sd, 'ja')) if (e.type === 'line' && e.at > 0) { n++; if (e.trap) tr++ } return +(tr / n).toFixed(2) })
+  expect(r >= 0.12 && r <= 0.35, r); return r
+})
+await t('後半ほど話が速く、「？」の間隔が詰まる', async () => {
+  const r = await p.evaluate(() => { const ev = nm.makeScript(5, 'ja').filter(e => e.type === 'line' && e.at > 0); const a = ev[0], b = ev[ev.length - 1]; return { cps: [+a.cps.toFixed(1), +b.cps.toFixed(1)], gap: [+(a.dur - a.cueAt).toFixed(2), +(b.dur - b.cueAt).toFixed(2)] } })
+  expect(r.cps[1] > r.cps[0] + 4, JSON.stringify(r)); return r
 })
 await t('輪っか: 「？」の直前に出て、ちょうどで緑になる', async () => {
   const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(7); const ci = g.ev.findIndex(e => e.type === 'line' && e.cue); while (g.i < ci) nm.dbg.step(1); const e = g.ev[ci]
@@ -148,9 +163,9 @@ await t('眠気: 何もしないと白目になる（40秒以内）→ 上司が
     return { at: +at.toFixed(1), shirome: g.st.shirome, notice: g.st.notice, eye: +eye.toFixed(2), lids: +lids.toFixed(2), snot, wake, mood: g.mood, anger: +nm.A.anger.toFixed(2), bubble: document.querySelector('#bubble').className } })
   expect(r.at > 5 && r.shirome === 1 && r.eye < -1 && r.snot && r.wake && r.notice === 1 && r.anger > 0.3 && /angry/.test(r.bubble), JSON.stringify(r)); return r
 })
-await t('眠気: 白目中に4回連打すると起きる（バレない）', async () => {
-  const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(9); nm.dbg.step(10); g.sleep = 99.99; nm.dbg.step(2); const a = g.asleep; for (let i = 0; i < 4; i++) { nm.nod(); nm.dbg.step(3) } nm.dbg.step(60 * 2.5); return { a, asleep: g.asleep, notice: g.st.notice, shirome: g.st.shirome, sleep: Math.round(g.sleep) } })
-  expect(r.a && !r.asleep && r.notice === 0 && r.shirome === 1, JSON.stringify(r)); return r
+await t('眠気: 白目中に7回連打すると起きる（6回では起きない）（バレない）', async () => {
+  const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(9); nm.dbg.step(10); g.sleep = 99.99; nm.dbg.step(2); const a = g.asleep; for (let i = 0; i < 6; i++) { nm.nod(); nm.dbg.step(3) } const six = g.asleep; nm.nod(); nm.dbg.step(60 * 2.5); return { a, six, asleep: g.asleep, notice: g.st.notice, shirome: g.st.shirome, sleep: Math.round(g.sleep) } })
+  expect(r.a && r.six && !r.asleep && r.notice === 0 && r.shirome === 1, JSON.stringify(r)); return r
 })
 await t('眠気: うなずくと覚める（完璧で -16）', async () => {
   const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(7); const ci = g.ev.findIndex(e => e.type === 'line' && e.cue); while (g.i < ci) nm.dbg.step(1); const e = g.ev[ci]; while (g.et < e.cueAt) nm.dbg.step(1); const s0 = g.sleep; nm.nod(); return +(g.sleep - s0).toFixed(1) })
@@ -164,11 +179,11 @@ await p.screenshot({ path: ROOT + '/shots/04-angry.png' })
 // ---------- 質問
 const toAsk = (p, k) => p.evaluate(k => { nm.dbg.pause(true); const g = nm.start(11); g.bot = 'perfect'; const ai = g.ev.findIndex(e => e.type === 'ask'); while (g.i < ai) nm.dbg.step(1); g.bot = null; while (g.ask.phase !== 'choose') nm.dbg.step(1)
   const shown = !document.querySelector('#ask').hidden, labels = [...document.querySelectorAll('#ask .btn span:last-child')].map(s => s.textContent), m = g.mood, e = g.ev[ai]
-  if (k === 'good') nm.choose(e.swap ? 1 : 0); else if (k === 'bad') nm.choose(e.swap ? 0 : 1); else for (let i = 0; i < 60 * 3.4; i++) nm.dbg.step(1)
+  if (k === 'good') nm.choose(e.swap ? 1 : 0); else if (k === 'bad') nm.choose(e.swap ? 0 : 1); else for (let i = 0; i < 60 * 2.3; i++) nm.dbg.step(1)
   nm.dbg.step(30); return { shown, labels, dm: g.mood - m, st: { g: g.st.askGood, b: g.st.askBad, t: g.st.askTimeout }, bubble: document.querySelector('#btext').textContent } }, k)
 await t('質問: それっぽい方を選ぶと機嫌が上がる', async () => { const r = await toAsk(p, 'good'); expect(r.shown && r.labels.length === 2 && r.labels.every(Boolean) && r.dm > 0 && r.st.g === 1, JSON.stringify(r)); return r.bubble })
 await t('質問: ズレすぎた方を選ぶと機嫌が下がる', async () => { const r = await toAsk(p, 'bad'); expect(r.dm < 0 && r.st.b === 1, JSON.stringify(r)); return r.bubble })
-await t('質問: 3秒たつと沈黙あつかい', async () => { const r = await toAsk(p, 'timeout'); expect(r.dm < 0 && r.st.t === 1, JSON.stringify(r)); return r.bubble })
+await t('質問: 2秒たつと沈黙あつかい', async () => { const r = await toAsk(p, 'timeout'); expect(r.dm < 0 && r.st.t === 1, JSON.stringify(r)); return r.bubble })
 await t('質問: 数字キー 1/2 でも選べる', async () => {
   await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(11); g.bot = 'perfect'; const ai = g.ev.findIndex(e => e.type === 'ask'); while (g.i < ai) nm.dbg.step(1); g.bot = null; while (g.ask.phase !== 'choose') nm.dbg.step(1) })
   await p.keyboard.press('2'); const r = await p.evaluate(() => nm.G.st.askGood + nm.G.st.askBad); expect(r === 1, r)
@@ -180,6 +195,14 @@ await p.screenshot({ path: ROOT + '/shots/05-ask.png' })
 await t('採点: 全部完璧なら特級（種10個）', async () => {
   const r = await p.evaluate(() => { const out = []; nm.dbg.pause(true); for (let s = 1; s <= 10; s++) { const g = nm.start(s); g.bot = 'perfect'; let k = 0; while (!g.over && k++ < 60 * 90) nm.dbg.step(1); out.push(g.result.grade.id) } return out })
   expect(r.every(x => x === 's'), r.join(','))
+})
+await t('採点: 上手い人のボット（ずれ0.05秒・返事85%）は特級が1〜5割（ぎりぎり）', async () => {
+  const r = await p.evaluate(() => { const out = []; nm.dbg.pause(true); for (let s = 1; s <= 20; s++) { const g = nm.start(s); g.bot = 'skilled'; let k = 0; while (!g.over && k++ < 60 * 90) nm.dbg.step(1); out.push(g.result.grade.id) } return out.join('') })
+  const n = [...r].filter(x => x === 's').length; expect(n >= 2 && n <= 11, r); return r
+})
+await t('採点: 適当に押すと4〜5級が大半', async () => {
+  const r = await p.evaluate(() => { const out = []; nm.dbg.pause(true); for (let s = 1; s <= 20; s++) { const g = nm.start(s); g.bot = 'random'; let k = 0; while (!g.over && k++ < 60 * 90) nm.dbg.step(1); out.push(g.result.grade.id) } return out.join('') })
+  const n = [...r].filter(x => x === '4' || x === '5').length; expect(n >= 15, r); return r
 })
 await t('採点: 何もしないと5級（白目あり）', async () => {
   const r = await p.evaluate(() => { nm.dbg.pause(true); const g = nm.start(3); g.bot = 'none'; let k = 0; while (!g.over && k++ < 60 * 90) nm.dbg.step(1); return { id: g.result.grade.id, z: g.st.shirome, cmt: g.result.cmt } })
