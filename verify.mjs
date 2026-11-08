@@ -91,7 +91,7 @@ await t('ブラウザの拡大が起きない（viewport・ピンチ・Ctrl+ホ�
 })
 await t('OGP 一式がある（og:image は ?v= 付きの公開URL）', async () => {
   const r = await p.evaluate(() => Object.fromEntries(['og:title', 'og:description', 'og:image', 'og:url', 'og:type'].map(k => [k, document.querySelector(`meta[property="${k}"]`)?.content]).concat([['tw', document.querySelector('meta[name="twitter:card"]')?.content]])))
-  expect(Object.values(r).every(Boolean) && r['og:image'] === 'https://tom3games.github.io/nod-master/og.png?v=1' && r.tw === 'summary_large_image' && r['og:url'] === 'https://tom3games.github.io/nod-master/', JSON.stringify(r))
+  expect(Object.values(r).every(Boolean) && r['og:image'] === 'https://tom3games.com/play/nod-master/og.png?v=1' && r.tw === 'summary_large_image' && r['og:url'] === 'https://tom3games.com/play/nod-master/', JSON.stringify(r))
 })
 await t('og.png が 1200x630 で置いてある', async () => { const b = await p.evaluate(async () => { const r = await fetch('og.png'); const bm = await createImageBitmap(await r.blob()); return [r.status, bm.width, bm.height] }); expect(b[0] === 200 && b[1] === 1200 && b[2] === 630, b); return b })
 await t('タイトルが日本語で出ている', async () => { const s = await p.textContent('.logo'); expect(s.includes('うなずき') && s.includes('マスター'), s); return s.slice(0, 20) })
