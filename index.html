@@ -42,7 +42,7 @@ button{font-family:inherit;color:inherit;font-size:inherit;font-weight:800}
 @keyframes flash{0%{opacity:1}100%{opacity:0}}
 
 .view{position:fixed;inset:0;height:100svh;overflow:hidden;z-index:5;display:flex;flex-direction:column;align-items:center;
-  padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(14px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) max(16px,env(safe-area-inset-left))}
 
 /* ボタン */
 .btn{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;font-size:18px;letter-spacing:.04em;border:3px solid var(--ink);border-radius:16px;min-height:56px;padding:0 20px;cursor:pointer;width:100%;
@@ -85,7 +85,7 @@ button{font-family:inherit;color:inherit;font-size:inherit;font-weight:800}
 .goal{font-weight:900;font-size:clamp(12px,1.9vh,15px);background:var(--yellow);border-radius:10px;padding:6px 10px;text-align:center}
 
 /* ---------- プレイ */
-#vPlay{padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:8px;cursor:pointer}
+#vPlay{padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) max(10px,env(safe-area-inset-left));gap:8px;cursor:pointer}
 .hud{width:100%;max-width:760px;display:flex;gap:8px;padding-right:58px;align-items:center}
 .meter{flex:1;display:flex;align-items:center;gap:6px;background:var(--paper);border:2.5px solid var(--ink);border-radius:12px;padding:4px 8px;height:40px;box-shadow:0 3px 0 var(--ink);min-width:0}
 .meter svg{width:26px;height:26px;flex:none}
@@ -131,7 +131,7 @@ button{font-family:inherit;color:inherit;font-size:inherit;font-weight:800}
 
 /* 2択 */
 body.asking .nodWrap{visibility:hidden}
-#ask{position:fixed;left:0;right:0;bottom:0;z-index:14;padding:12px max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:flex;flex-direction:column;align-items:center;gap:8px;background:linear-gradient(transparent,rgba(14,22,48,.75) 30%);cursor:default}
+#ask{position:fixed;left:0;right:0;bottom:0;z-index:14;padding:12px max(12px,env(safe-area-inset-right)) max(14px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px))) max(12px,env(safe-area-inset-left));display:flex;flex-direction:column;align-items:center;gap:8px;background:linear-gradient(transparent,rgba(14,22,48,.75) 30%);cursor:default}
 #ask .tbar{width:min(560px,100%);height:12px;border-radius:7px;background:rgba(255,255,255,.3);border:2px solid var(--ink);overflow:hidden}
 #ask .tbar i{display:block;height:100%;background:var(--yellow);width:100%}
 #ask .row{width:min(560px,100%)}
@@ -173,6 +173,22 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
   .resBtns .btn{min-height:44px}
   .stats{font-size:12px}
 }
+/* X のアプリの中: 下の帯（--inapp-bot）の分だけ結果を詰める */
+@media (max-height:700px) and (max-aspect-ratio:1/1){
+  html.inapp-x #vResult{gap:6px;padding-top:max(50px,calc(env(safe-area-inset-top) + 44px))}
+  html.inapp-x .resWrap{gap:6px}
+  html.inapp-x .cert{padding:8px 12px 6px}
+  html.inapp-x #hanko{width:clamp(72px,12vh,96px)}
+  html.inapp-x .bossCmt svg{width:40px}
+  html.inapp-x .bossCmt p{font-size:12px;padding:6px 10px;line-height:1.4}
+  html.inapp-x .resBtns{gap:6px}
+  html.inapp-x .resBtns .btn{min-height:40px}
+  html.inapp-x .resBtns .btn.red{min-height:46px;font-size:18px}
+}
+@media (max-height:620px) and (max-aspect-ratio:1/1){
+  html.inapp-x .cert h3{display:none}
+  html.inapp-x .bossCmt p{padding:4px 8px}
+}
 /* 背の低い横画面 */
 @media (max-height:560px) and (min-aspect-ratio:1/1){
   #vTitle{align-items:flex-start;justify-content:space-between;padding-top:max(14px,env(safe-area-inset-top))}
@@ -187,7 +203,7 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
   .goal{font-size:12px;padding:4px 8px}
   .hud{max-width:none}
   .bubble{max-width:none;font-size:clamp(14px,2.6vw,19px);padding:6px 14px;height:calc(1.5em * 2 + 18px)}
-  .ctrl{position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-width:none;pointer-events:none}
+  .ctrl{position:fixed;left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));bottom:max(8px,calc(env(safe-area-inset-bottom) + var(--inapp-bot,0px)));width:auto;max-width:none;pointer-events:none}
   .ctrl>*{pointer-events:auto}
   .sleepBox{max-width:220px}
   .nodWrap{width:min(88px,22vh);margin:0 24px 18px 0}
@@ -308,6 +324,6 @@ html[lang=en] #ask .btn{overflow-wrap:normal;word-break:normal}
 <script src="snd.js?v=3"></script>
 <script src="data.js?v=3"></script>
 <script type="module" src="game.js?v=3"></script>
-<script src="support.js?v=4" data-ja="お茶" data-en="tea"></script>
+<script src="support.js?v=5" data-ja="お茶" data-en="tea"></script>
 </body>
 </html>
